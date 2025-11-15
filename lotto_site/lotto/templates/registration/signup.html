@@ -1,0 +1,36 @@
+{% extends "lotto/base.html" %}
+
+{% block content %}
+<div class="container mt-5" style="max-width: 500px;">
+    <h2 class="mb-4">회원가입 (Sign Up)</h2>
+    <hr>
+    
+    <form method="post">
+        {% csrf_token %}
+        
+        {% comment %} 폼 필드와 오류 메시지를 Bootstrap 스타일로 출력 {% endcomment %}
+        {% for field in form %}
+            <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% for error in field.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+
+        {% comment %} 폼 전체 오류 메시지 출력 {% endcomment %}
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-success btn-lg w-100 mt-3">가입하기</button>
+    </form>
+    
+    <div class="text-center mt-3">
+        <a href="{% url 'login' %}">이미 계정이 있으신가요? 로그인</a>
+    </div>
+</div>
+{% endblock %}

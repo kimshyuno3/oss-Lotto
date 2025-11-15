@@ -1,0 +1,139 @@
+{% extends "lotto/base.html" %} 
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>👑 관리자 대시보드</h2>
+    <p class="lead">로또 판매 실적 확인 및 새로운 회차 추첨을 관리합니다.</p>
+
+    {% comment %} View에서 전달된 메시지 (추첨 성공, 실적 집계 완료 등) 표시 {% endcomment %}
+    
+
+    <div class="row mt-4">
+        
+        <div class="col-md-6 mb-4">
+            <div class="card border-info">
+                <div class="card-header bg-info text-white">
+                    <h5>🎲 현재 회차 정보</h5>
+                </div>
+                <div class="card-body">
+                    {% if latest_round %}
+                        {% with is_finalized=latest_round.num1 %}
+                            <p>가장 최근 생성된 회차: **제 {{ latest_round.round }} 회차**</p>
+                            <p>추첨 예정일: {{ latest_round.draw_date }}</p>
+                            
+                            {% if is_finalized %}
+                                <div class="alert alert-success mt-3">
+                                    <h6>✅ {{ latest_round.round }}회차 추첨 완료</h6>
+                                    **당첨 번호:** {% for num in latest_round.get_winning_numbers %}
+                                        <span class="badge bg-danger me-1">{{ num }}</span>
+                                    {% endfor %}
+                                    <span class="badge bg-warning text-dark ms-2">보너스: {{ latest_round.bonus_number }}</span>
+                                    
+                                    {% comment %} 실적 집계 완료 상태 표시 (finalize_lotto_round에 통합됨) {% endcomment %}
+                                    {% if latest_round.salesperformance %}
+                                        <p class="text-success mt-2 mb-0">👉 **판매 실적 집계 완료** (총 판매: {{ latest_round.salesperformance.total_sales }}장)</p>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <div class="alert alert-warning mt-3">
+                                    <h6>⚠️ {{ latest_round.round }}회차 판매 중 (추첨 대기)</h6>
+                                    당첨 번호가 아직 확정되지 않았습니다.
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+                    {% else %}
+                        <div class="alert alert-danger">
+                            아직 생성된 로또 회차가 없습니다. 아래 버튼으로 1회차를 시작해 주세요.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-4">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5>➡️ 로또 시스템 관리</h5>
+                </div>
+                <div class="card-body">
+                    
+                    {% comment %}
+                    단순화된 관리 흐름:
+                    1. num1이 null이면 (판매 중): 추첨 및 자동 집계 버튼 표시 (finalize_lotto_round)
+                    2. num1이 null이 아니면 (추첨 완료): 다음 회차 생성 버튼 표시 (create_next_round)
+                    {% endcomment %}
+
+                    {% if latest_round and not latest_round.num1 %}
+                        {# 1. 추첨 및 실적 집계 (현재 회차 판매 중) #}
+                        <h4 class="text-danger">1. {{ latest_round.round }}회차 추첨 및 자동 집계</h4>
+                        <p class="text-muted">판매를 마감하고 **당첨 번호 확정**과 **판매 실적 집계**를 **한 번에** 처리합니다.</p>
+                        <form method="post" action="{% url 'finalize_lotto_round' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-lg w-100">
+                                <i class="fas fa-dice"></i> {{ latest_round.round }} 회차 **추첨 및 자동 집계**
+                            </button>
+                        </form>
+
+                    {% else %}
+                        {# 2. 다음 회차 생성 (추첨 완료 후 혹은 최초 시작) #}
+                        <h4 class="text-primary">1. 다음 회차 생성 ({{ next_round_number }}회차)</h4>
+                        <p class="text-muted">새로운 회차(제 **{{ next_round_number }} 회차**)를 생성하여 로또 **구매를 시작**합니다.</p>
+                        <form method="post" action="{% url 'create_next_round' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary btn-lg w-100">
+                                <i class="fas fa-plus-circle"></i> 제 {{ next_round_number }} 회차 **생성 및 판매 시작**
+                            </button>
+                        </form>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <hr class="my-5">
+    
+    <div class="card border-secondary mb-5">
+        <div class="card-header bg-secondary text-white">
+            <h5>📋 전체 회차 판매 실적 목록</h5>
+        </div>
+        <div class="card-body">
+            {% if all_sales_performance %}
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>회차</th>
+                            <th>추첨일</th>
+                            <th>총 판매 (장)</th>
+                            <th>총 당첨자</th>
+                            <th class="text-success">1등 당첨</th>
+                            <th class="text-info">2등 당첨</th>
+                            <th class="text-warning">3등 당첨</th>
+                            <th>관리</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sales in all_sales_performance %}
+                        <tr>
+                            <td><strong>제 {{ sales.round.round }} 회차</strong></td>
+                            <td>{{ sales.round.draw_date|date:"Y-m-d" }}</td>
+                            <td>{{ sales.total_sales|default:"0" }}</td>
+                            <td>{{ sales.total_winners|default:"0" }}</td>
+                            <td class="text-success">{{ sales.rank1_winners|default:"0" }}</td>
+                            <td class="text-info">{{ sales.rank2_winners|default:"0" }}</td>
+                            <td class="text-warning">{{ sales.rank3_winners|default:"0" }}</td>
+                            <td><a href="{% url 'admin:lotto_salesperformance_change' sales.pk %}" class="btn btn-sm btn-outline-secondary">상세</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <small class="text-muted">전체 판매 실적 및 상세 정보는 Django 관리자 페이지에서 확인 가능합니다.</small>
+            {% else %}
+                <div class="alert alert-warning mb-0">아직 집계된 판매 실적이 없습니다.</div>
+            {% endif %}
+        </div>
+    </div>
+    </div>
+{% endblock content %}

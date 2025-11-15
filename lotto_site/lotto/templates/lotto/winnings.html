@@ -1,0 +1,75 @@
+{% extends "lotto/base.html" %} 
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>🏆 내 로또 구매 내역 및 당첨 확인</h2>
+    <p class="lead">{{ request.user.username }}님이 구매하신 로또 내역입니다. (총 {{ results|length }} 건)</p>
+    
+    {% if not results %}
+        <div class="alert alert-info">아직 로또 구매 내역이 없습니다. <a href="{% url 'lotto_purchase' %}">지금 구매</a>해 보세요!</div>
+    {% endif %}
+
+    <table class="table table-hover mt-4">
+        <thead class="table-dark">
+            <tr>
+                <th>회차</th>
+                <th>구매 유형</th>
+                <th>구매 번호</th>
+                <th>추첨 번호 (보너스)</th>
+                <th>구매 일시</th>
+                <th>당첨 결과</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for result in results %}
+            <tr>
+                <td>{{ result.purchase.round.round|default:"N/A" }}</td>
+                <td>
+                    {% if result.purchase.lotto_type == 'A' %}
+                        자동
+                    {% else %}
+                        수동
+                    {% endif %}
+                </td>
+                <td>
+                    {% for num in result.purchased_numbers %}
+                        <span class="badge bg-primary text-white me-1">{{ num }}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if result.winning_numbers %}
+                        {% for num in result.winning_numbers %}
+                            <span class="badge bg-danger me-1">{{ num }}</span>
+                        {% endfor %}
+                        <span class="badge bg-warning text-dark ms-2">보너스: {{ result.bonus_number }}</span>
+                    {% else %}
+                        추첨 대기 중
+                    {% endif %}
+                </td>
+                <td>{{ result.purchase.purchase_date|date:"Y-m-d H:i" }}</td>
+                <td>
+                    {% if result.rank == -1 %}
+                        <span class="badge bg-secondary">추첨 대기</span>
+                    {% elif result.rank == 0 %}
+                        <span class="badge bg-dark">낙첨 (0등)</span>
+                    {% elif result.rank == 1 %}
+                        <span class="badge bg-success fs-5">🥇 1등 당첨!</span>
+                    {% elif result.rank == 2 %}
+                        <span class="badge bg-success">🥈 2등 당첨!</span>
+                    {% elif result.rank == 3 %}
+                        <span class="badge bg-info">🥉 3등 당첨!</span>
+                    {% elif result.rank == 4 %}
+                        <span class="badge bg-warning text-dark">4등</span>
+                    {% elif result.rank == 5 %}
+                        <span class="badge bg-light text-dark">5등</span>
+                    {% else %}
+                        <span class="badge bg-danger">오류</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock content %}

@@ -1,0 +1,59 @@
+{% extends "lotto/base.html" %} 
+{% load static %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>로또 구매하기</h2>
+
+    {% if current_round %}
+        <p class="lead">현재 구매 가능한 회차: **제 {{ current_round.round }} 회차**</p>
+    {% else %}
+        <div class="alert alert-danger">구매 가능한 로또 회차가 없습니다.</div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header">
+            <h4>1. 수동 구매 (번호 직접 선택)</h4>
+        </div>
+        <div class="card-body">
+            <form method="post" action="{% url 'lotto_purchase' %}">
+                {% csrf_token %}
+                <div class="row">
+                    {% for field in form %}
+                    <div class="col-2">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                {% if form.non_field_errors %}
+                    <div class="alert alert-warning mt-3">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <button type="submit" name="manual_purchase" class="btn btn-primary mt-3">
+                    <i class="fas fa-ticket-alt"></i> 수동 구매 확정
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h4>2. 자동 구매 (랜덤 번호 생성)</h4>
+        </div>
+        <div class="card-body">
+            <p>버튼을 누르시면 1부터 45까지의 숫자 중 랜덤으로 6개의 번호가 선택됩니다.</p>
+            <form method="post" action="{% url 'lotto_purchase' %}">
+                {% csrf_token %}
+                <button type="submit" name="auto_purchase" class="btn btn-success">
+                    <i class="fas fa-magic"></i> 자동 구매
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock content %}

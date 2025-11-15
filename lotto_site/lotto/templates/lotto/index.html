@@ -1,0 +1,17 @@
+{% extends "lotto/base.html" %} 
+{% block title %}로또 시뮬레이션 서비스{% endblock %}
+
+{% block content %}
+<div class="container mt-5 text-center">
+    <h2>로또 시뮬레이션 서비스에 오신 것을 환영합니다! 🥳</h2>
+    <p class="lead">{{ message }}</p>
+    
+    {% if not request.user.is_authenticated %}
+        <p>서비스를 이용하려면 아래 버튼을 눌러주세요.</p>
+        <a href="{% url 'login' %}" class="btn btn-primary btn-lg">로그인하기</a>
+    {% endif %}
+
+    <hr>
+    <p class="text-muted">이곳은 Django 로또 프로젝트의 홈 화면입니다.</p>
+</div>
+{% endblock %}
