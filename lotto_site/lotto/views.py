@@ -1,16 +1,15 @@
 from django.shortcuts import render, redirect, get_object_or_404
-
-from django.contrib.auth.decorators import login_required, user_passes_test # <-- 이 부분을 추가합니다.
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.db.models import Prefetch
-from django.contrib.auth.mixins import UserPassesTestMixin # UserPassesTestMixin 유지
-from django.utils import timezone
+from django.contrib.auth.mixins import UserPassesTestMixin
+from django.utils import timezone # timezone 모듈을 사용하여 현재 시간을 가져옵니다.
 from django.http import HttpResponse
 from datetime import date, timedelta
 import random
-from django.urls import reverse_lazy # redirect 경로를 지연 로드하기 위해 필요
+from django.urls import reverse_lazy 
 from django.views.generic.edit import CreateView
-from django.contrib.auth.forms import UserCreationForm # 기본 회원가입 폼 사용
+from django.contrib.auth.forms import UserCreationForm 
 
 # 로또 앱 내에서 정의된 모델과 폼, 유틸리티 함수를 import합니다.
 from .models import Purchase, LottoRound, SalesPerformance 
@@ -39,17 +38,7 @@ def generate_auto_numbers():
     """1부터 45 사이의 중복 없는 랜덤한 6개 번호를 생성하고 정렬하여 반환합니다."""
     return sorted(random.sample(range(1, 46), 6))
 
-def generate_winning_numbers():
-    """당첨 번호 6개와 보너스 번호 1개를 생성하는 헬퍼 함수"""
-    all_numbers = list(range(1, 46))
-    winning_numbers = random.sample(all_numbers, 6)
-    
-    # 보너스 번호는 당첨 번호에 포함되지 않은 수 중에서 선택
-    remaining_numbers = [n for n in all_numbers if n not in winning_numbers]
-    # remaining_numbers가 비어있지 않다고 가정하고 choice를 사용 (1~45 중 6개 선택이므로 항상 39개 이상 남음)
-    bonus_number = random.choice(remaining_numbers)
-    
-    return sorted(winning_numbers), bonus_number
+# generate_winning_numbers 헬퍼 함수는 finalize_lotto_round 함수 내에서 직접 처리되므로 제거합니다.
 
 # ----------------------------------------------------------------------
 # 사용자 기능 뷰
@@ -57,10 +46,10 @@ def generate_winning_numbers():
 
 class SignUpView(CreateView):
     form_class = UserCreationForm  # Django가 제공하는 기본 폼 사용
-    # 회원가입 성공 후 리다이렉트할 URL (lazy를 사용하여 URL 로딩 순서 문제 방지)
-    # 여기서는 로그인 페이지로 리다이렉트하도록 설정합니다.
+    # 회원가입 성공 후 리다이렉트할 URL 
     success_url = reverse_lazy('login') 
     template_name = 'registration/signup.html'
+    
 def lotto_home(request):
     """메인 페이지 뷰 (로그인 상태에 따라 메시지 변경)"""
     if request.user.is_authenticated:
@@ -68,8 +57,12 @@ def lotto_home(request):
     else:
         message = '로또 서비스를 이용하려면 로그인해 주세요.'
     
+    # ✨ [추가] 가장 최근 추첨 완료된 회차 정보를 가져옵니다.
+    latest_drawn_round = LottoRound.objects.filter(actual_draw_date__isnull=False).order_by('-round').first()
+    
     return render(request, 'lotto/index.html', {
         'message': message,
+        'latest_drawn_round': latest_drawn_round,
     }) 
 
 @login_required
@@ -147,7 +140,8 @@ def check_winnings(request):
 
         if purchase.round:
             # LottoRound가 존재하고, 당첨 번호가 확정된 경우에만 판정 시도
-            if purchase.round.num1 is not None:
+            # ✨ [수정] draw_date 필드 대신 actual_draw_date가 NULL이 아닌지 확인
+            if purchase.round.actual_draw_date is not None:
                 try:
                     winning_round = purchase.round
                     winning_numbers = winning_round.get_winning_numbers()
@@ -182,27 +176,28 @@ def check_winnings(request):
 def admin_dashboard(request):
     """관리자 전용 대시보드 뷰: 최근 회차 정보 및 전체 실적 목록 제공"""
     
-    # 별도로 is_superuser를 체크할 필요 없이 데코레이터가 처리합니다.
-    # 단, 데코레이터가 실패할 경우 기본 리다이렉트가 'accounts/login'이 될 수 있으므로, 
-    # 필요한 경우 settings.py에 LOGIN_URL이나 LOGIN_REDIRECT_URL을 설정해야 합니다.
-
     # 1. 가장 최근 생성된 회차 정보
     try:
         latest_round = LottoRound.objects.latest('round')
-        # 다음 회차 번호 계산
         next_round_number = latest_round.round + 1
+        
+        # 2. 현재 회차의 총 판매 장수 계산
+        current_round_sales_count = Purchase.objects.filter(round=latest_round).count()
+        
     except LottoRound.DoesNotExist:
         latest_round = None
         next_round_number = 1
-        
-    # 2. **[추가]** 모든 판매 실적 목록을 최신 회차(내림차순)로 가져옵니다.
+        current_round_sales_count = 0 # 회차가 없으면 판매 장수도 0
+
+    # 3. 전체 판매 실적 목록
     # SalesPerformance는 LottoRound와 OneToOne 관계이므로, select_related('round')로 LottoRound 정보를 효율적으로 가져옵니다.
     all_sales_performance = SalesPerformance.objects.select_related('round').order_by('-round__round')
 
     context = {
         'latest_round': latest_round,
         'next_round_number': next_round_number,
-        # **[추가]** 전체 실적 목록
+        # 현재 회차의 총 판매 장수
+        'current_round_sales_count': current_round_sales_count, 
         'all_sales_performance': all_sales_performance, 
     }
     
@@ -213,24 +208,22 @@ def admin_dashboard(request):
 @user_passes_test(lambda u: u.is_superuser)
 def create_next_round(request):
     """
-    다음 회차를 생성합니다. (당첨 번호는 비워두고 판매를 시작함)
-    URL 이름이 draw_lotto_round에서 create_next_round로 변경됨.
+    다음 회차를 생성합니다. (당첨 번호와 실제 추첨일은 비워두고 판매를 시작함)
     """
     if request.method == 'POST':
         try:
             latest_round = LottoRound.objects.latest('round')
             next_round_number = latest_round.round + 1
-            # 이전 회차 추첨일로부터 일주일 후로 설정 (단순화)
-            next_draw_date = latest_round.draw_date + timedelta(days=7) 
+            # ✨ [수정] draw_date 계산 로직을 제거했습니다.
         except LottoRound.DoesNotExist:
             # 최초 회차 생성 (1회차)
             next_round_number = 1
-            next_draw_date = date.today() + timedelta(days=7)
         
-        # 새로운 회차를 당첨 번호 없이 생성
+        # 새로운 회차를 당첨 번호 및 실제 추첨일 없이 생성
         LottoRound.objects.create(
             round=next_round_number,
-            draw_date=next_draw_date
+            # ✨ [수정] draw_date 필드에 대한 저장을 제거했습니다.
+            # actual_draw_date는 null 상태로 유지됩니다.
         )
         
         messages.success(request, f"**제 {next_round_number} 회차**가 성공적으로 생성되었으며, 지금부터 구매 가능합니다.")
@@ -257,11 +250,15 @@ def finalize_lotto_round(request):
             winning_set = set(random.sample(all_numbers, 7)) 
             
             winning_numbers = sorted(list(winning_set)[:6])
-            bonus_number = list(winning_set - set(winning_numbers))[0]
+            # 보너스 번호는 7개의 뽑힌 번호 중 당첨 번호 6개에 포함되지 않은 것
+            bonus_number = list(winning_set - set(winning_numbers))[0] 
             
             current_round.num1, current_round.num2, current_round.num3 = winning_numbers[0], winning_numbers[1], winning_numbers[2]
             current_round.num4, current_round.num5, current_round.num6 = winning_numbers[3], winning_numbers[4], winning_numbers[5]
             current_round.bonus_number = bonus_number
+            
+            # ✨ [추가] 실제 추첨이 완료된 시점의 날짜/시간을 기록
+            current_round.actual_draw_date = timezone.now() 
             current_round.save()
             
             # --------------------------------------------------------
@@ -298,6 +295,7 @@ def finalize_lotto_round(request):
             # 5. 메시지 및 리다이렉션
             messages.success(request, 
                 f"✅ **제 {round_number} 회차** 추첨 및 판매 실적 집계가 완료되었습니다! "
+                f"추첨 일시: {current_round.actual_draw_date.strftime('%Y-%m-%d %H:%M')}"
                 f"이제 다음 회차를 생성하여 판매를 시작해 주세요."
             )
             return redirect('admin_dashboard')

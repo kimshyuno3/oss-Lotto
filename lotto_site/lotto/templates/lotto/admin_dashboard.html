@@ -20,7 +20,8 @@
                     {% if latest_round %}
                         {% with is_finalized=latest_round.num1 %}
                             <p>가장 최근 생성된 회차: **제 {{ latest_round.round }} 회차**</p>
-                            <p>추첨 예정일: {{ latest_round.draw_date }}</p>
+                            
+                            <p><strong>현재 판매 장수:</strong> <span class="badge bg-primary fs-6">{{ current_round_sales_count|default:"0" }} 장</span></p>
                             
                             {% if is_finalized %}
                                 <div class="alert alert-success mt-3">
@@ -38,7 +39,7 @@
                             {% else %}
                                 <div class="alert alert-warning mt-3">
                                     <h6>⚠️ {{ latest_round.round }}회차 판매 중 (추첨 대기)</h6>
-                                    당첨 번호가 아직 확정되지 않았습니다.
+                                    
                                 </div>
                             {% endif %}
                         {% endwith %}

@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
-from django.utils import timezone # Purchase 모델에 auto_now_add를 사용해도 되지만, 명시적 사용을 위해 추가
+from django.utils import timezone 
 
 # 로또 번호는 1부터 45 사이의 값만 유효하도록 검증합니다.
 LOTTO_NUMBER_VALIDATORS = [
@@ -11,14 +11,20 @@ LOTTO_NUMBER_VALIDATORS = [
 
 class LottoRound(models.Model):
     """
-    회차별 당첨 번호 정보와 추첨일을 저장하는 모델 (관리자 기능)
+    회차별 당첨 번호 정보와 실제 추첨 완료 일시를 저장하는 모델 (관리자 기능)
     """
     round = models.IntegerField(
         unique=True,
         verbose_name="회차",
         help_text="로또 회차 번호"
     )
-    draw_date = models.DateField(verbose_name="추첨일")
+    # 기존 draw_date(추첨 예정일)을 제거하고, 실제 추첨이 완료된 시점을 기록하는 필드를 추가
+    actual_draw_date = models.DateTimeField(
+        verbose_name="실제 추첨 일시", 
+        null=True, 
+        blank=True,
+        help_text="관리자가 추첨을 완료한 시점"
+    )
     
     # 6개의 당첨 번호: 추첨 전에는 NULL이어야 하므로 null=True, blank=True 추가
     num1 = models.IntegerField(validators=LOTTO_NUMBER_VALIDATORS, null=True, blank=True)
@@ -43,7 +49,7 @@ class LottoRound(models.Model):
         return sorted([self.num1, self.num2, self.num3, self.num4, self.num5, self.num6])
 
     def __str__(self):
-        return f"제 {self.round} 회차 ({self.draw_date})"
+        return f"제 {self.round} 회차 (추첨 완료: {self.actual_draw_date.strftime('%Y-%m-%d %H:%M') if self.actual_draw_date else '미완료'})"
 
 class Purchase(models.Model):
     """

@@ -6,3 +6,4 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+      - ./data/db:/app/db  # 호스트의 ./data/db 폴더와 컨테이너 내부의 /app/db 폴더를 매핑
